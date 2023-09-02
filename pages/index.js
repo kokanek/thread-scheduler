@@ -1,7 +1,7 @@
 'use client'
 import {
   Container, Input, Button, VStack, Flex, Heading, Text, Stack, HStack,
-  Textarea, Box, Select, FormControl, FormLabel, useToast,
+  Textarea, Box, Select, FormControl, FormLabel, useToast, Spinner,
   Modal, ModalOverlay, ModalContent, ModalHeader, ModalFooter, ModalBody, ModalCloseButton
 } from '@chakra-ui/react'
 import { ArrowForwardIcon } from '@chakra-ui/icons'
@@ -23,24 +23,34 @@ export default function ContentScheduler() {
   const [newUserName, setNewUserName] = useState('');
   const [newUserToken, setNewUserToken] = useState('');
   const [activeUserToken, setActiveUserToken] = useState('');
+  const [loadingThreads, setLoadingThreads] = useState(false);
 
   useEffect(() => {
+    async function fetchData() {
+      setLoadingThreads(true);
+      const res = await fetch('/api/schedule', { method: 'GET', headers: { 'Content-Type': 'application/json', 'x-api-key': activeUserToken } });
+      setLoadingThreads(false);
+      const threads = await res.json();
+      threads.sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt));
+      setScheduledThreads(threads);
+    }
+
     let userData = []
     if (typeof window !== 'undefined') {
       // Perform localStorage action
       userData = localStorage.getItem('users')
       setUsers(JSON.parse(userData) || []);
-    }
-  }, [])
 
-  useEffect(() => {
-    async function fetchData() {
-      const res = await fetch('/api/schedule', { method: 'GET', headers: { 'Content-Type': 'application/json', 'x-api-key': activeUserToken } });
-      const threads = await res.json();
-      threads.sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt));
-      setScheduledThreads(threads);
+      // fetch active user
+      let localStoredActiveUser = localStorage.getItem('activeUser');
+      if (localStoredActiveUser) {
+        setActiveUserToken(JSON.parse(localStoredActiveUser));
+      }
     }
-    fetchData();
+
+    if (activeUserToken) {
+      fetchData();
+    }
   }, [activeUserToken])
 
   const onRephraseClick = async () => {
@@ -101,20 +111,25 @@ export default function ContentScheduler() {
       setSummary('');
 
       // get fresh scheduled threads
-      await fetch('/api/schedule', { method: 'GET', headers: { 'Content-Type': 'application/json', 'x-api-key': activeUserToken } });
-      const threads = await res.json();
+      console.log('fetching fresh threads');
+
+      await new Promise((res, rej) => setTimeout(() => { res() }, 1000))
+      setLoadingThreads(true);
+      const newResponse = await fetch('/api/schedule', { method: 'GET', headers: { 'Content-Type': 'application/json', 'x-api-key': activeUserToken } });
+      setLoadingThreads(false);
+      const threads = await newResponse.json();
       threads.sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt));
       setScheduledThreads(threads);
+      console.log('new thread list set: ', threads);
     }
   }
 
   const onUserSelect = (e) => {
-    console.log(e.target.value);
-
     if (e.target.value === 'addUser') {
       setIsModalOpen(true);
     } else {
       setActiveUserToken(e.target.value);
+      localStorage.setItem('activeUser', JSON.stringify(e.target.value));
     }
   }
 
@@ -164,15 +179,17 @@ export default function ContentScheduler() {
               <option value='6'>6 Hours apart</option>
               <option value='9'>9 Hours apart</option>
             </Select>
-            <Select placeholder='Select user' maxW={40} onChange={onUserSelect}>
+            <Select placeholder='Select user' maxW={40} onChange={onUserSelect} value={activeUserToken}>
               {users.map((user, index) => <option key={index} value={user.token}>{user.name}</option>)}
               <option value='addUser'>Add user</option>
             </Select>
           </Flex>
           <VStack outline='2px solid #efefef' gap={2} p={2} maxH='75vh' overflowY='auto' >
-            {scheduledThreads.map((thread, index) =>
-              <ScheduledCard key={index} title={thread.title} content={thread.message} time={thread.scheduledAt} />
-            )}
+            {loadingThreads ?
+              <Spinner size='xl' />
+              : scheduledThreads.map((thread, index) =>
+                <ScheduledCard key={index} title={thread.title} content={thread.message} time={thread.scheduledAt} />
+              )}
           </VStack>
         </Flex>
       </Flex>
