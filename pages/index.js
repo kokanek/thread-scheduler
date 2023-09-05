@@ -92,7 +92,7 @@ export default function ContentScheduler() {
     }
 
     const latestScheduledThread = scheduledThreads[scheduledThreads.length - 1];
-    const latestScheduledAt = new Date(latestScheduledThread.scheduledAt);
+    const latestScheduledAt = latestScheduledThread ? new Date(latestScheduledThread?.scheduledAt) : new Date();
     const randomMinutes = Math.floor(Math.random() * 60);
     const nextScheduledAt = new Date(latestScheduledAt.getTime() + Number(frequency) * 60 * 60 * 1000 + randomMinutes * 60 * 1000);
     const res = await fetch('/api/schedule', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': activeUserToken }, body: JSON.stringify({ title, summary, time: nextScheduledAt.toISOString() }) });
