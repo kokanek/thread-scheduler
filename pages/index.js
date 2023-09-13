@@ -7,9 +7,9 @@ import {
 import { ArrowForwardIcon } from '@chakra-ui/icons'
 import { useState } from 'react'
 import { useEffect } from 'react'
+import { isTwitterUrl } from '../utils'
 
 export default function ContentScheduler() {
-
   const toast = useToast()
   const [url, setUrl] = useState('');
   const [summary, setSummary] = useState('');
@@ -57,15 +57,29 @@ export default function ContentScheduler() {
     setTitle('Generating title...');
     setSummary('Summarizing...');
 
-    const res = await fetch('/api/summarize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: url }) });
-    const data = await res.json();
+    if (isTwitterUrl(url)) {
+      const tweetId = url.split('/').pop();
+      const res = await fetch(`/api/tweet/${tweetId}`, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+      const data = await res.json();
 
-    console.log(data);
-    if (data.summary) {
-      setTitle(data.title);
-      setSummary(data.summary);
+      console.log('twitter data', data);
+      if (data.rephrased) {
+        setTitle(data.title);
+        setSummary(data.rephrased);
+      } else {
+        setSummary('Error while summarizing');
+      }
+
     } else {
-      setSummary('Error while summarizing');
+      const res = await fetch('/api/summarize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: url }) });
+      const data = await res.json();
+
+      if (data.summary) {
+        setTitle(data.title);
+        setSummary(data.summary);
+      } else {
+        setSummary('Error while summarizing');
+      }
     }
   }
 
@@ -152,7 +166,6 @@ export default function ContentScheduler() {
     setIsModalOpen(false);
   }
 
-  console.log('active user', activeUserToken);
   return (
     <Container maxW={'5xl'} py={6}>
       <Heading as='h2' size='3xl' my="4" >Thread scheduler</Heading>
